@@ -2,6 +2,11 @@ import bpy
 import numpy
 from .jsonFunctions import objectDataToDico
 
+def boneMatrix(widget,matchBone):
+    widget.matrix_local = matchBone.bone.matrix_local
+    widget.scale = [matchBone.bone.length,matchBone.bone.length,matchBone.bone.length]
+    widget.data.update()    
+
 def fromWidgetFindBone(widget):
     matchBone = None
     for ob in bpy.context.scene.objects :
@@ -12,37 +17,79 @@ def fromWidgetFindBone(widget):
                     
     return matchBone
 
-def createWidget(bone,widget,size,scale,slide,invert):
+def createWidget(bone,widget,relative,size,scale,slide):
     C = bpy.context
     D = bpy.data
-
+    
+    if bone.custom_shape_transform :
+        matrixBone = bone.custom_shape_transform
+    else :
+        matrixBone = bone
+    
     if bone.custom_shape :
         bone.custom_shape.name = bone.custom_shape.name+"_old"
         bone.custom_shape.data.name = bone.custom_shape.data.name+"_old"
-        if [True for i in C.scene.objects if bone.custom_shape == i] :
+        if C.scene.objects.get(bone.custom_shape.name) :
             C.scene.objects.unlink(bone.custom_shape)
         
     newData = D.meshes.new(bone.name)
-    print(widget['faces'])
-    newData.from_pydata(numpy.array(widget['vertices'])*[size*invert*scale[0],size*scale[2],size*scale[1]]+[0,slide,0],widget['edges'],widget['faces'])
+    
+    if relative == True :
+        boneLength = 1
+    else : 
+        boneLength = (1/bone.bone.length)
+    
+    newData.from_pydata(numpy.array(widget['vertices'])*[size*scale[0]*boneLength,size*scale[2]*boneLength,size*scale[1]*boneLength]+[0,slide,0],widget['edges'],widget['faces'])
     newData.update(calc_edges=True)
-    if invert == 1 :
-        newObject = D.objects.new('WGT-%s'%bone.name,newData)    
 
-    else :
-        newObject = findMirrorObject(bone).custom_shape.copy()
-
+    newObject = D.objects.new('WGT-%s'%bone.name,newData)    
+        
     newObject.data = newData
     newObject.name = 'WGT-%s'%bone.name
     C.scene.objects.link(newObject)
-    newObject.matrix_local = bone.bone.matrix_local
-    newObject.scale = [bone.bone.length,bone.bone.length,bone.bone.length]
-
-    newData.update()
+    newObject.matrix_local = matrixBone.bone.matrix_local
+    newObject.scale = [matrixBone.bone.length,matrixBone.bone.length,matrixBone.bone.length]
+    C.scene.update()
+    
     bone.custom_shape = newObject
     bone.bone.show_wire = True
     newObject.layers = [False,False,False,False,False,False,False,False,False,True,False,False,False,False,False,False,False,False,False,False]
+    
+def symmetrizeWidget(bone):
+    C = bpy.context
+    D = bpy.data
+    
+    widget = bone.custom_shape
+    if findMirrorObject(bone).custom_shape_transform :
+        mirrorBone = findMirrorObject(bone).custom_shape_transform
+    else :
+        mirrorBone = findMirrorObject(bone)
+    mirrorWidget = mirrorBone.custom_shape
+    
+    if mirrorWidget :
+        mirrorWidget.name = mirrorWidget.name+"_old"
+        mirrorWidget.data.name = mirrorWidget.data.name+"_old"
+        if C.scene.objects.get(mirrorWidget.name) :
+            C.scene.objects.unlink(mirrorWidget)
         
+    newData = widget.data.copy()  
+    for vert in newData.vertices :
+        vert.co = numpy.array(vert.co)*(-1,1,1)
+    
+    newObject = widget.copy()
+    newObject.data = newData
+    newData.update()
+    newObject.name = 'WGT-%s'%mirrorBone.name
+    C.scene.objects.link(newObject)
+    newObject.matrix_local = mirrorBone.bone.matrix_local
+    newObject.scale = [mirrorBone.bone.length,mirrorBone.bone.length,mirrorBone.bone.length]
+    
+    C.scene.update()
+    mirrorBone.custom_shape = newObject
+    mirrorBone.bone.show_wire = True
+    newObject.layers = [False,False,False,False,False,False,False,False,False,True,False,False,False,False,False,False,False,False,False,False]    
+    
+    
 def editWidget(active_bone):
     C = bpy.context
     D = bpy.data
@@ -98,7 +145,7 @@ def findMirrorObject(object):
     else :
         return bpy.context.scene.objects.get(mirroredObjectName)
     
-def symmetrizeShape():
+def findMatchBones():
     C = bpy.context
     D = bpy.data
     
@@ -126,12 +173,6 @@ def symmetrizeShape():
         
         activeObject = fromWidgetFindBone(C.object)
         armature = activeObject.id_data
-    
-    for bone in widgetsAndBones :
-        if activeObject.name.endswith("L") :
-            if bone.name.endswith("L") and widgetsAndBones[bone]:
-                createWidget(findMirrorObject(bone),objectDataToDico(widgetsAndBones[bone]),1,[1,1,1],0,-1)
-        else :
-            if bone.name.endswith("R") and widgetsAndBones[bone]:
-                createWidget(findMirrorObject(bone),objectDataToDico(widgetsAndBones[bone]),1,[1,1,1],0,-1)
+    return (widgetsAndBones,activeObject,armature)
+
     

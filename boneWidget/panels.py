@@ -12,19 +12,19 @@ class bw_posemode_panel(bpy.types.Panel):
     items =[]
     for key,value in readWidgets().items():
         items.append(key)
-    
+
     itemsSort =[]
     for key in sorted(items):
         itemsSort.append((key,key,""))
-    
-    bpy.types.Scene.widget_list = bpy.props.EnumProperty(name="Shape",items=itemsSort,description="Shape" )
+
+    bpy.types.Scene.widget_list = bpy.props.EnumProperty(name="Shape",items=itemsSort,description="Shape" )   
     bpy.types.Scene.contract_list = bpy.props.BoolProperty(name = "Contract_list", description = "Contract_list")
     
     def draw(self, context):
         layout = self.layout     
         row = layout.row(align= True)        
         
-        if context.scene['contract_list']==False :
+        if context.scene.contract_list==False :
             row.prop(context.scene, "widget_list", expand=True)
         else :
             row.prop(context.scene, "widget_list", expand=False,text="")
@@ -47,5 +47,4 @@ class bw_specials(Menu):
         layout.operator("bonewidget.match_bone_transforms", icon = 'GROUP_BONE')
         layout.operator("bonewidget.add_widgets",icon = "ZOOMIN",text="Add Widgets")
         layout.operator("bonewidget.remove_widgets",icon = "ZOOMOUT",text="Remove Widgets")
-        layout.operator("bonewidget.contractExpand_",icon = "TRIA_RIGHT",text="Remove Widgets")
         layout.prop(context.scene, "contract_list")  

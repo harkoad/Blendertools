@@ -1,19 +1,21 @@
 import bpy
 import os
 import json
+import numpy
 
 def objectDataToDico(object) :
     verts = []
-    for v in object.data.vertices:
-        verts.append(v.co.to_tuple())
-
+    mesh = object.copy().to_mesh(bpy.context.scene, True, 'PREVIEW')
+    for v in mesh.vertices:
+        verts.append(tuple(numpy.array(tuple(v.co))*(object.scale[0],object.scale[1],object.scale[2])))
+        #verts.append(tuple(v.co))
     polygons = []
-    for p in object.data.polygons:
+    for p in mesh.polygons:
         polygons.append(tuple(p.vertices))
     
     edges = []
     
-    for e in object.data.edges:
+    for e in mesh.edges:
         if len(polygons)!= 0 :
             for vert_indices in polygons :                         
                 if e.key[0] and e.key[1] not in vert_indices :
@@ -22,7 +24,7 @@ def objectDataToDico(object) :
             edges.append(e.key)
                 
     wgts = {"vertices":verts,"edges":edges,"faces":polygons}    
-    print(wgts)
+    #print(wgts)
     return(wgts)
 
 def readWidgets():
@@ -43,10 +45,17 @@ def addRemoveWidgets(context,addOrRemove,items,widgets):
         widget_items.append(widget_item[1])
     
     if addOrRemove == 'add' :        
+        suffixes_1 = ("WGT-","wgt-","CS-","cs-")
+        suffixes_2 = ("WGT_","wgt_","CS_","cs_")
         for ob in widgets :        
-            ob_name = ob.name.replace("WGT-","")
+            if ob.name.startswith(suffixes_1) :
+                ob_name = ob.name.split("-",1)[1]
+            elif ob.name.startswith(suffixes_2) :
+                ob_name = ob.name.split("_",1)[1]            
+            else :
+                ob_name = ob.name
             wgts[ob_name]= objectDataToDico(ob)
-            if (ob_name,ob_name,"") not in widget_items :
+            if (ob_name) not in widget_items :
                 widget_items.append(ob_name)      
         
     elif addOrRemove == 'remove' :

@@ -1,12 +1,16 @@
 import bpy
 
-from .functions import symmetrizeShape
+from .functions import findMatchBones
 from .functions import fromWidgetFindBone
+from .functions import findMirrorObject
+from .functions import symmetrizeWidget
+from .functions import boneMatrix
 from .functions import createWidget
 from .functions import editWidget
 from .functions import returnToArmature
 from .functions import addRemoveWidgets
 from .functions import readWidgets
+from .functions import objectDataToDico
 from bpy.types import Operator  
 from bpy.props import FloatProperty, BoolProperty, FloatVectorProperty
 
@@ -20,16 +24,16 @@ class bw_createWidget(bpy.types.Operator):
     def poll(cls, context):
         return (context.object and context.object.mode == 'POSE')
 
+    relative_size = BoolProperty(  
+        name="Relative size",  
+        default=True,  
+        description="Widget size proportionnal to Bone size"  
+        ) 
+        
     global_size = FloatProperty(  
-       name="Global Size :",  
+       name="Global Size : ",  
        default=1.0,  
-       description="Global Size :" 
-       )  
-
-    scale = FloatVectorProperty(  
-       name="Scale :",  
-       default=[1,1,1],  
-       description="Scale :" 
+       description="Global Size : " 
        )  
 
     slide = FloatProperty(  
@@ -39,12 +43,21 @@ class bw_createWidget(bpy.types.Operator):
        unit='LENGTH',  
        description="slide"  
        ) 
+    
+    def draw(self, context):
+        layout = self.layout     
+        row = layout.row(align= True)  
+        row.prop(self, "relative_size")
+        row = layout.row(align= True)  
+        row.prop(self, "global_size", expand=False)
+        row = layout.row(align= True)  
+        row.prop(self, "slide")
 
     def execute(self, context):       
         wgts = readWidgets()
         for bone in bpy.context.selected_pose_bones :
-            createWidget(bone,wgts[context.scene.widget_list],self.global_size,self.scale,self.slide,1)
-    
+            createWidget(bone,wgts[context.scene.widget_list],self.relative_size,self.global_size,[1,1,1],self.slide)
+                        
         return {'FINISHED'}
 
 
@@ -68,8 +81,7 @@ class bw_returnToArmature(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return (context.object and context.object.type == 'MESH' 
-            and context.object.mode == 'EDIT' 
-                or context.object.mode == 'OBJECT')
+            and context.object.mode in ['EDIT','OBJECT'] )
 
     def execute(self, context):
         if fromWidgetFindBone(bpy.context.object):    
@@ -80,25 +92,30 @@ class bw_returnToArmature(bpy.types.Operator):
         
         return {'FINISHED'}
 
+
+        
 class bw_MatchBoneTransforms(bpy.types.Operator):
     bl_idname = "bonewidget.match_bone_transforms"
     bl_label = "Match bone transforms"
-
+    
     def execute(self, context):
-        widgets = []
-        if bpy.context.object.type== "ARMATURE" :
+        if bpy.context.mode == "POSE" :
             for bone in bpy.context.selected_pose_bones :
-                widgets.append(bone.custom_shape)
-            
-        else :
-            widgets = bpy.context.selected_objects
+                if bone.custom_shape_transform and bone.custom_shape:
+                    boneMatrix(bone.custom_shape,bone.custom_shape_transform)
+                elif bone.custom_shape :
+                    boneMatrix(bone.custom_shape,bone)
                 
-        for widget in widgets : 
-            matchBone = fromWidgetFindBone(widget)
-            if matchBone :
-                widget.matrix_local = matchBone.bone.matrix_local
-                widget.scale = [matchBone.bone.length,matchBone.bone.length,matchBone.bone.length]
-                widget.data.update()
+        else  :
+            for ob in bpy.context.selected_objects :
+                if ob.type == 'MESH' :
+                    matchBone = fromWidgetFindBone(ob)
+                    if matchBone :
+                        if matchBone.custom_shape_transform :
+                            boneMatrix(ob,matchBone.custom_shape_transform)
+                        else :
+                            boneMatrix(ob,matchBone)
+
         return {'FINISHED'}
 
 
@@ -108,7 +125,18 @@ class bw_match_symmetrizeShape(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}  
        
     def execute(self, context):
-        symmetrizeShape()
+        widgetsAndBones= findMatchBones()[0]
+        activeObject= findMatchBones()[1]
+        widgetsAndBones= findMatchBones()[0]
+        
+        for bone in widgetsAndBones :
+            if activeObject.name.endswith("L") :
+                if bone.name.endswith("L") and widgetsAndBones[bone]:
+                    symmetrizeWidget(bone)
+            else :
+                if bone.name.endswith("R") and widgetsAndBones[bone]:
+                    symmetrizeWidget(bone)
+
         return {'FINISHED'}
 
 

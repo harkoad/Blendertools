@@ -20,7 +20,7 @@ Created by Manuel Rais and Christophe Seux
 
 bl_info = {
     "name": "Bone Widget",
-    "author": "Manuel Rais","Christophe Seux"
+    "author": "Manuel Rais, Christophe Seux",
     "version": (1, 0),
     "blender": (2, 77, 0),
     "location": "",
@@ -29,25 +29,33 @@ bl_info = {
     "wiki_url": "",
     "tracker_url": "",
     "category": "Rigging"}
-
+'''
 if "bpy" in locals():
     import imp
     imp.reload(operators)
     imp.reload(panels)
+'''
 
-else:
-    from . import operators
-    from . import panels
-
+from . import operators
+from . import panels
+from .functions import readWidgets
+    
 import bpy
 import os
 
 
+
+
 def register():
+    
     bpy.utils.register_module(__name__)
-   
+    
+
+    
 def unregister():
     bpy.utils.unregister_module(__name__)
+
+
     
 '''
 if __name__ == "__main__":
